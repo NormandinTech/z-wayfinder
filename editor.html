@@ -60,6 +60,18 @@ input[type=range]{width:100%;accent-color:var(--ember)}
 .modehint[hidden]{display:none}
 .empty-map[hidden]{display:none}
 .empty-map{position:absolute;inset:0;display:grid;place-items:center;color:var(--dust);font-family:var(--cond);letter-spacing:.06em;text-transform:uppercase;z-index:500;pointer-events:none}
+dialog.st{width:min(980px,96vw);max-height:92vh;background:var(--panel);color:var(--sand);border:1px solid var(--line);border-radius:10px;padding:0}
+dialog.st::backdrop{background:rgba(0,0,0,.7)}
+.st-head{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line)}
+.st-head h3{margin:0;font-family:var(--cond);letter-spacing:.06em;text-transform:uppercase;font-size:1.05rem;color:var(--ember)}
+.st-body{padding:16px;overflow:auto;max-height:calc(92vh - 60px);display:flex;flex-direction:column;gap:14px}
+.st-body ol.how{margin:0;padding-left:20px;color:var(--dust);line-height:1.6;font-size:.95rem}
+.st-body ol.how b{color:var(--sand)}
+.cropwrap{position:relative;display:inline-block;max-width:100%;user-select:none;touch-action:none;line-height:0}
+.cropwrap canvas{max-width:100%;height:auto;display:block;border-radius:6px}
+.cropbox{position:absolute;border:2px solid var(--ember);box-shadow:0 0 0 9999px rgba(0,0,0,.5);pointer-events:none}
+.thumbs{display:flex;gap:6px;flex-wrap:wrap;max-height:120px;overflow:auto}
+.thumbs img{height:48px;border-radius:4px;border:1px solid var(--line)}
 .toast{position:fixed;left:50%;top:70px;transform:translateX(-50%);background:var(--panel-2);border:1px solid var(--ember);color:var(--sand);padding:10px 16px;border-radius:6px;font-family:var(--cond);letter-spacing:.04em;z-index:2000;box-shadow:0 8px 30px rgba(0,0,0,.5);max-width:90vw}
 .leaflet-container{background:#0f0c0a;font-family:var(--body)}
 .town{font-family:var(--cond);font-weight:600;letter-spacing:.04em;color:#f3e7d2;text-shadow:0 1px 2px #000,0 0 6px #000;white-space:nowrap;font-size:12px}
@@ -90,6 +102,7 @@ details summary{cursor:pointer;font-family:var(--cond);letter-spacing:.06em;text
     <section>
       <h2><span class="n">1</span>Your map</h2>
       <label class="drop" id="drop"><input type="file" id="file" accept="image/png,image/jpeg,image/webp"><b>Drop your map image here</b><span class="help" style="font-size:.85rem">or click to choose. PNG, JPG or WebP, square, the whole map edge to edge. Use an image you made or have permission to use.</span></label>
+      <button class="btn" id="stOpen" type="button" style="margin-top:8px;width:100%;white-space:normal">Make a map from in-game screenshots</button>
       <div class="row" style="margin-top:10px">
         <label class="f" style="flex:2">Map name<input type="text" id="mapName" placeholder="e.g. My Server — Takistan" maxlength="60"></label>
         <label class="f" style="flex:1">Width (m)<input type="number" id="mapSize" value="12800" min="1000" max="40960" step="10"></label>
@@ -145,10 +158,46 @@ details summary{cursor:pointer;font-family:var(--cond);letter-spacing:.06em;text
     </section>
   </aside>
 </main>
+<dialog class="st" id="st">
+  <div class="st-head"><h3>Map from screenshots</h3><div class="grow"></div><button class="btn" id="stClose" type="button">Close</button></div>
+  <div class="st-body">
+    <section id="stStep1">
+      <ol class="how">
+        <li>On your server, open the map and <b>hide all markers</b>. Zoom in until town names and roads are clear, then <b>don't change the zoom</b> again.</li>
+        <li>Start at the <b>top-left corner</b> of the map. Take a screenshot (F12 in Steam, or Print Screen).</li>
+        <li>Drag the map so about <b>a third of the last shot still shows</b>, and take the next one. Go <b>left to right</b> across the top row.</li>
+        <li>Move down a row (again keeping about a third overlapping), go back to the left edge, and repeat until you reach the bottom-right corner.</li>
+        <li>Drop all the screenshots below. They're put in order by file name, which is the order you took them in.</li>
+      </ol>
+      <label class="drop" id="stDrop" style="margin-top:10px"><input type="file" id="stFiles" accept="image/png,image/jpeg,image/webp" multiple><b>Drop your screenshots here</b><span class="help" style="font-size:.85rem">or click to choose them all at once</span></label>
+      <div class="thumbs" id="stThumbs" style="margin-top:8px"></div>
+      <div class="row" style="margin-top:10px">
+        <label class="f" style="width:170px">Screenshots per row<input type="number" id="stCols" min="1" max="30" value="4"></label>
+        <span class="help" id="stCount"></span>
+      </div>
+    </section>
+    <section id="stStep2" hidden>
+      <p class="help"><b style="color:var(--sand)">Drag a box over the map area</b> of this screenshot, leaving out the game's menus and edges. The same box is used for every screenshot.</p>
+      <div class="cropwrap" id="stCropWrap" style="margin-top:8px"><canvas id="stCropCv"></canvas><div class="cropbox" id="stCropBox" hidden></div></div>
+    </section>
+    <section id="stStep3" hidden>
+      <p class="help" id="stResultMsg"></p>
+      <div class="bar" id="stBar"><i></i></div>
+      <p class="help" style="margin-top:6px" id="stTrimHelp" hidden><b style="color:var(--sand)">Drag a box exactly around the map's edges</b> to trim off anything outside the map, then press Use this map.</p>
+      <div class="cropwrap" id="stOutWrap" style="margin-top:8px"><canvas id="stOutCv"></canvas><div class="cropbox" id="stOutBox" hidden></div></div>
+    </section>
+    <div class="row">
+      <button class="btn" id="stBack" type="button" hidden>Back</button>
+      <div class="grow"></div>
+      <button class="btn btn-fire" id="stNext" type="button" disabled>Next</button>
+    </div>
+  </div>
+</dialog>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="tracer.js"></script>
 <script src="router.js"></script>
+<script src="stitch.js"></script>
 <script>
 (function(){
 'use strict';
@@ -419,6 +468,95 @@ function saveDraftSoon(){ clearTimeout(draftT); draftT=setTimeout(async()=>{ try
 (async()=>{ try{ const d=await db(); const r=d.transaction('drafts').objectStore('drafts').get('current');
   r.onsuccess=async()=>{ const v=r.result; if(!v||!v.blob) return;
     if(confirm('Continue the map you were working on ("'+(v.p.name||'Untitled')+'")?')){ await restore(v.p,v.blob); $('draftMsg').textContent='Draft restored.'; } }; }catch{} })();
+
+
+// ---------- map from screenshots ----------
+(function(){
+  const dlg=$('st'); let files=[], step=1, crop=null, outCrop=null, stitched=null, sw=null;
+  const show=n=>{step=n;['stStep1','stStep2','stStep3'].forEach((id,i)=>$(id).hidden=i+1!==n);$('stBack').hidden=n===1;
+    $('stNext').textContent=n===3?'Use this map':'Next'; nextState();};
+  const nextState=()=>{ $('stNext').disabled = step===1?files.length<2 : step===2?!crop : !stitched; };
+  $('stOpen').onclick=()=>{dlg.showModal();show(1);};
+  $('stClose').onclick=()=>{ if(sw){sw.terminate();sw=null;} dlg.close(); };
+  const setFiles=list=>{
+    files=[...list].filter(f=>/^image\//.test(f.type)).sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}));
+    $('stThumbs').innerHTML=''; files.slice(0,60).forEach(f=>{const im=document.createElement('img');im.src=URL.createObjectURL(f);im.alt=f.name;$('stThumbs').appendChild(im);});
+    // guess columns: most common near-square grid
+    const n=files.length; if(n){let c=Math.round(Math.sqrt(n*0.8));while(c>1&&n%c)c--; if(c>1)$('stCols').value=c;}
+    countMsg(); nextState();
+  };
+  const countMsg=()=>{const n=files.length,c=+$('stCols').value||1; $('stCount').textContent=n?`${n} screenshots · ${Math.ceil(n/c)} rows`+(n%c?` (last row has ${n%c})`:''):'';};
+  $('stCols').oninput=countMsg;
+  $('stFiles').onchange=e=>setFiles(e.target.files);
+  const d=$('stDrop');
+  ['dragenter','dragover'].forEach(t=>d.addEventListener(t,e=>{e.preventDefault();d.classList.add('over');}));
+  ['dragleave','drop'].forEach(t=>d.addEventListener(t,e=>{e.preventDefault();d.classList.remove('over');}));
+  d.addEventListener('drop',e=>setFiles(e.dataTransfer.files));
+
+  // drag-to-select box on a canvas; returns crop in canvas pixel units via cb
+  function cropper(cv,box,cb){
+    let a=null;
+    const pt=e=>{const r=cv.getBoundingClientRect();return [Math.max(0,Math.min(cv.width,(e.clientX-r.left)/r.width*cv.width)),Math.max(0,Math.min(cv.height,(e.clientY-r.top)/r.height*cv.height))];};
+    const draw=(p,q)=>{const r=cv.getBoundingClientRect(),k=r.width/cv.width;const x=Math.min(p[0],q[0]),y=Math.min(p[1],q[1]),w=Math.abs(p[0]-q[0]),h=Math.abs(p[1]-q[1]);
+      Object.assign(box.style,{left:x*k+'px',top:y*k+'px',width:w*k+'px',height:h*k+'px'});box.hidden=false;return {x:Math.round(x),y:Math.round(y),w:Math.round(w),h:Math.round(h)};};
+    cv.onpointerdown=e=>{a=pt(e);cv.setPointerCapture(e.pointerId);};
+    cv.onpointermove=e=>{if(a)draw(a,pt(e));};
+    cv.onpointerup=e=>{if(!a)return;const c=draw(a,pt(e));a=null;cb(c.w>20&&c.h>20?c:null);};
+  }
+  async function bitmap(f){ return await createImageBitmap(f); }
+
+  async function toStep2(){
+    const bm=await bitmap(files[0]); const cv=$('stCropCv'); cv.width=bm.width; cv.height=bm.height; cv.getContext('2d').drawImage(bm,0,0);
+    if(!crop){ // default: trim 6% each side, a common HUD margin
+      crop={x:Math.round(bm.width*.06),y:Math.round(bm.height*.08),w:Math.round(bm.width*.88),h:Math.round(bm.height*.84)}; }
+    show(2); requestAnimationFrame(()=>{const r=cv.getBoundingClientRect(),k=r.width/cv.width;Object.assign($('stCropBox').style,{left:crop.x*k+'px',top:crop.y*k+'px',width:crop.w*k+'px',height:crop.h*k+'px'});$('stCropBox').hidden=false;});
+    cropper(cv,$('stCropBox'),c=>{crop=c;nextState();});
+  }
+
+  async function toStep3(){
+    show(3); stitched=null; outCrop=null; nextState(); $('stTrimHelp').hidden=true; $('stOutBox').hidden=true;
+    const cols=Math.max(1,+$('stCols').value||1);
+    $('stResultMsg').textContent='Reading screenshots…'; $('stBar').hidden=false; $('stBar').firstElementChild.style.width='3%';
+    // crop every screenshot; keep full-res crops for compositing, send pixels to the worker
+    const crops=[], msg=[];
+    for(let i=0;i<files.length;i++){
+      const bm=await bitmap(files[i]);
+      if(i&&(bm.width!==crops[0].sw||bm.height!==crops[0].sh)){ $('stResultMsg').textContent='All screenshots must be the same size. '+files[i].name+' is different.'; return; }
+      const c=document.createElement('canvas'); c.width=crop.w; c.height=crop.h; const g=c.getContext('2d',{willReadFrequently:true});
+      g.drawImage(bm,crop.x,crop.y,crop.w,crop.h,0,0,crop.w,crop.h); c.sw=bm.width; c.sh=bm.height; crops.push(c);
+      const buf=g.getImageData(0,0,crop.w,crop.h).data.buffer; msg.push({width:crop.w,height:crop.h,buffer:buf});
+      $('stBar').firstElementChild.style.width=Math.round(3+i/files.length*20)+'%';
+    }
+    $('stResultMsg').textContent='Lining up the overlaps…';
+    if(sw) sw.terminate(); sw=new Worker('stitch-worker.js');
+    sw.onmessage=ev=>{const m=ev.data;
+      if(m.type==='progress'){$('stBar').firstElementChild.style.width=Math.round(23+m.f*72)+'%';return;}
+      sw.terminate(); sw=null; $('stBar').hidden=true;
+      if(m.type==='error'){$('stResultMsg').textContent='Stitching failed: '+m.msg;return;}
+      const r=m.res; const k=Math.min(1,8192/Math.max(r.width,r.height));
+      const cv=$('stOutCv'); cv.width=Math.round(r.width*k); cv.height=Math.round(r.height*k);
+      const g=cv.getContext('2d'); g.fillStyle='#0f0c0a'; g.fillRect(0,0,cv.width,cv.height);
+      crops.forEach((c,i)=>g.drawImage(c,r.pos[i][0]*k,r.pos[i][1]*k,c.width*k,c.height*k));
+      stitched=cv; outCrop=null;
+      const weakNames=[...new Set(r.weak.flatMap(p=>[p.i,p.j]))].map(i=>files[i].name);
+      $('stResultMsg').innerHTML=`Stitched ${files.length} screenshots into ${cv.width} × ${cv.height} px.`+(r.weak.length?` <span style="color:var(--ember)">${r.weak.length} overlap${r.weak.length>1?'s':''} didn't line up clearly (${esc(weakNames.slice(0,4).join(', '))}${weakNames.length>4?'…':''}). Check those areas; if they look wrong, retake them with more overlap, or check the screenshots per row.</span>`:' Every overlap lined up.');
+      $('stTrimHelp').hidden=false; cropper(cv,$('stOutBox'),c=>{outCrop=c;});
+      nextState();
+    };
+    sw.postMessage({tiles:msg,cols},msg.map(t=>t.buffer));
+  }
+
+  async function finish(){
+    let src=stitched, c=outCrop||{x:0,y:0,w:src.width,h:src.height};
+    const out=document.createElement('canvas'); out.width=c.w; out.height=c.h; out.getContext('2d').drawImage(src,c.x,c.y,c.w,c.h,0,0,c.w,c.h);
+    const blob=await new Promise(res=>out.toBlob(res,'image/jpeg',0.9));
+    Object.defineProperty(blob,'name',{value:'stitched-map.jpg'});
+    dlg.close(); await loadImage(blob); toast('Map stitched. Set the map width, then find the roads.',5000);
+  }
+  $('stNext').onclick=()=>{ if(step===1) toStep2(); else if(step===2) toStep3(); else finish(); };
+  $('stBack').onclick=()=>{ if(sw){sw.terminate();sw=null;} if(step===3) toStep2(); else show(1); };
+  window.__st={setFiles,toStep2,toStep3,finish,get crop(){return crop},set crop(v){crop=v}};
+})();
 
 window.__ed={S,loadImage,setMode,finishDraw,addTest,redraw,map,drawPts}; // for testing
 enable();
