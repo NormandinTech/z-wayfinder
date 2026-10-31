@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Z Wayfinder</title>
+<meta name="description" content="Z Wayfinder, a free route planner for DayZ players: pick a map, tap where you are and where you want to go, and get a road route with turn-by-turn directions.">
+<meta name="theme-color" content="#14110e">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Stencil+One&family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&family=Share+Tech+Mono&display=swap">
+<style>
+:root{
+  --ground:#14110e; --panel:#1d1915; --panel-2:#26201a; --line:#3a3027;
+  --sand:#e9dcc6; --dust:#a99a85; --fire:#f0662a; --ember:#ffb347; --blood:#c4352b; --olive:#9bb24a; --sky:#5ab7e8;
+  --display:"Saira Stencil One",Impact,"Arial Narrow",sans-serif;
+  --body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --cond:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --mono:"Share Tech Mono",ui-monospace,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--ground);color:var(--sand);font-family:var(--body);-webkit-font-smoothing:antialiased}
+body{display:flex;flex-direction:column;overflow:hidden}
+header{display:flex;align-items:center;gap:12px;padding:10px max(14px,env(safe-area-inset-left)) 10px max(14px,env(safe-area-inset-right));background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap}
+header h1{margin:0;font-family:var(--display);font-weight:400;font-size:1.35rem;letter-spacing:.02em;line-height:1}
+header h1 span{color:var(--olive)}
+header .grow{flex:1}
+.btn{display:inline-flex;align-items:center;gap:8px;font-family:var(--cond);font-weight:700;font-size:.95rem;letter-spacing:.06em;text-transform:uppercase;text-decoration:none;border-radius:6px;padding:9px 13px;border:1px solid var(--line);background:var(--panel-2);color:var(--sand);cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:var(--ember)}
+.btn-steam{background:#1b2838;border-color:#3d5a78;color:#dbe7f3}
+.btn-steam:hover{border-color:#66c0f4}
+.btn-fire{background:var(--fire);border-color:var(--fire);color:#1a0d05}
+.btn[aria-pressed="true"]{background:rgba(255,179,71,.16);border-color:var(--ember);color:var(--ember)}
+.status{font-family:var(--cond);font-size:.9rem;letter-spacing:.04em;color:var(--dust);display:flex;align-items:center;gap:6px}
+.dot{width:9px;height:9px;border-radius:50%;background:#6b6156;display:inline-block}
+.dot.on{background:var(--olive);box-shadow:0 0 8px var(--olive)}
+.dot.warn{background:var(--ember)}
+main{flex:1;display:grid;grid-template-columns:minmax(0,1fr) 360px;min-height:0}
+#map{background:#0f0c0a;min-height:0}
+aside{background:var(--panel);border-left:1px solid var(--line);overflow:auto;padding:16px;display:flex;flex-direction:column;gap:16px}
+h2{margin:0 0 8px;font-family:var(--cond);font-weight:700;font-size:.82rem;letter-spacing:.16em;text-transform:uppercase;color:var(--ember)}
+.card{background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:12px}
+.me{display:flex;flex-direction:column;gap:4px}
+.me b{font-family:var(--cond);font-size:1.15rem;letter-spacing:.03em}
+.me .grid{font-family:var(--mono);color:var(--dust);font-size:.92rem}
+.help{color:var(--dust);font-size:.92rem;line-height:1.5;margin:0}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+ol.wps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+ol.wps li{display:grid;grid-template-columns:26px minmax(0,1fr) auto;gap:8px;align-items:center;background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:7px 8px}
+.wpn{font-family:var(--mono);font-size:.82rem;text-align:center;border-radius:4px;padding:1px 0;background:var(--ember);color:var(--ground)}
+.wpn.start{background:var(--sky)}
+.leaflet-tooltip{font-family:var(--cond);font-weight:600;letter-spacing:.03em;background:#1d1915;color:#e9dcc6;border:1px solid #3a3027}
+.leaflet-tooltip-top:before{border-top-color:#3a3027}
+.wpl{font-size:.93rem;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wpl small{display:block;font-family:var(--mono);color:var(--dust);font-size:.78rem}
+.x{background:none;border:0;color:var(--dust);font-size:1.1rem;cursor:pointer;padding:2px 6px}
+.x:hover{color:var(--blood)}
+.sum{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.sum div{background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:8px}
+.sum .k{font-family:var(--cond);font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--dust)}
+.sum .v{font-family:var(--cond);font-weight:700;font-size:1.15rem;font-variant-numeric:tabular-nums}
+ol.dirs{margin:0;padding:0;list-style:none;display:flex;flex-direction:column}
+ol.dirs li{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:8px;padding:9px 0;border-bottom:1px solid var(--line);align-items:start;font-size:.95rem}
+ol.dirs li:last-child{border-bottom:0}
+.ic{font-size:1.05rem;line-height:1.2;text-align:center;color:var(--ember)}
+.dd{font-family:var(--mono);color:var(--dust);font-size:.85rem;white-space:nowrap}
+.empty{color:var(--dust);font-size:.92rem;font-style:italic}
+.evlist{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
+.evlist li{display:grid;grid-template-columns:18px minmax(0,1fr) auto;gap:8px;align-items:center;font-size:.92rem}
+.evlist .sw{width:14px;height:14px;border-radius:50%;border:2px solid currentColor}
+.evlist .n{font-family:var(--cond);font-weight:700;color:var(--ember)}
+.storm{margin-top:8px;padding:8px 10px;border-radius:6px;background:rgba(214,170,90,.18);border:1px solid #d6aa5a;color:#f0d39b;font-family:var(--cond);font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+.evtag{font-family:var(--cond);font-weight:700;font-size:.8rem;letter-spacing:.05em;text-transform:uppercase;padding:2px 6px;border-radius:4px;background:rgba(0,0,0,.55);color:#fff;white-space:nowrap}
+.toast{position:fixed;left:50%;top:70px;transform:translateX(-50%);background:var(--panel-2);border:1px solid var(--ember);color:var(--sand);padding:10px 16px;border-radius:6px;font-family:var(--cond);letter-spacing:.04em;z-index:2000;box-shadow:0 8px 30px rgba(0,0,0,.5);max-width:90vw}
+/* map bits */
+.leaflet-container{background:#0f0c0a;font-family:var(--body)}
+.town{font-family:var(--cond);font-weight:600;letter-spacing:.04em;color:#f3e7d2;text-shadow:0 1px 2px #000,0 0 6px #000;white-space:nowrap;font-size:12px;pointer-events:none}
+.town.city{font-size:14px;font-weight:700;text-transform:uppercase}
+.mepin{width:34px;height:34px;position:relative}
+.mepin .ring{position:absolute;inset:6px;border-radius:50%;background:var(--sky);border:3px solid #fff;box-shadow:0 0 0 6px rgba(90,183,232,.25),0 2px 8px rgba(0,0,0,.6)}
+.mepin .arrow{position:absolute;left:50%;top:-6px;width:0;height:0;margin-left:-6px;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:12px solid #fff;transform-origin:6px 23px}
+.wpin{width:26px;height:26px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:var(--ember);border:2px solid #1a0d05;display:grid;place-items:center;box-shadow:0 2px 6px rgba(0,0,0,.6)}
+.wpin span{transform:rotate(45deg);font-family:var(--mono);font-size:12px;color:#1a0d05;font-weight:700}
+.wpin.start{background:var(--sky)}
+.pick select{font-family:var(--cond);font-weight:700;font-size:1rem;letter-spacing:.04em;background:var(--panel-2);color:var(--sand);border:1px solid var(--line);border-radius:6px;padding:8px 10px;max-width:60vw}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.btn-live{background:rgba(90,183,232,.14);border-color:#3d6f8f;color:#cfe9f7}
+.coords{position:absolute;right:10px;bottom:10px;z-index:1000;background:rgba(20,17,14,.85);border:1px solid var(--line);border-radius:6px;padding:5px 9px;font-family:var(--mono);font-size:.82rem;color:var(--dust);pointer-events:none}
+@media (max-width:860px){
+  main{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto}
+  aside{border-left:0;border-top:1px solid var(--line);max-height:36vh}
+  header h1{font-size:1.1rem}
+  .coords{display:none}
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>Z <span>Wayfinder</span></h1>
+  <label class="pick"><span class="sr">Map</span><select id="mapSel" aria-label="Choose a map"></select></label>
+  <div class="grow"></div>
+  <a class="btn" href="editor.html">Server owners</a>
+  <a class="btn btn-live" id="liveBtn" href="#live">📍 Live position · $2/mo</a>
+</header>
+<main>
+  <div id="map" style="position:relative"><div class="coords" id="coords">—</div></div>
+  <aside>
+    <section>
+      <h2>Route</h2>
+      <p class="help">Your first tap is where you are, the next taps are where you're going. Drag pins to move them.</p>
+      <ol class="wps" id="wps" style="margin-top:10px"></ol>
+      <div class="row" style="margin-top:10px">
+        <button class="btn" id="clearBtn" type="button">Clear route</button>
+        <button class="btn" id="roadsBtn" aria-pressed="false" type="button">Show roads</button>
+      </div>
+    </section>
+    <section id="sumSec" hidden>
+      <div class="sum">
+        <div><div class="k">Distance</div><div class="v" id="sDist">–</div></div>
+        <div><div class="k">On road</div><div class="v" id="sRoad">–</div></div>
+        <div><div class="k">Drive</div><div class="v" id="sTime">–</div></div>
+      </div>
+    </section>
+    <section>
+      <h2>Directions</h2>
+      <ol class="dirs" id="dirs"><li class="empty" style="display:block;border:0">Add a destination to get directions.</li></ol>
+    </section>
+    <section id="live">
+      <h2>Live position</h2>
+      <div class="card"><p class="help" style="margin:0">See your own dot move on the map while you play, with routes starting from where you stand. $2/month, on servers that run the free position script. Only you ever see your dot.</p><p class="help" style="margin:8px 0 0;color:var(--ember)">Coming soon.</p></div>
+    </section>
+    <p class="help" style="font-size:.82rem" id="credit"></p>
+    <p class="help" style="font-size:.78rem">Z Wayfinder is a fan-made tool, not affiliated with or authorized by Bohemia Interactive a.s. DayZ is a trademark of Bohemia Interactive a.s.</p>
+  </aside>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="router.js"></script>
+<script>
+(async function(){
+const $=id=>document.getElementById(id);
+const toast=(m,ms=3200)=>{const t=document.createElement('div');t.className='toast';t.textContent=m;document.body.appendChild(t);setTimeout(()=>t.remove(),ms);};
+const ll=(x,z)=>L.latLng(z,x);
+const grid=(x,z)=>String(Math.floor(x/100)).padStart(3,'0')+' '+String(Math.floor(z/100)).padStart(3,'0');
+const fmtD=m=>m>=1000?(m/1000).toFixed(m>=10000?0:1)+' km':Math.round(m/10)*10+' m';
+const fmtT=s=>s<60?'<1 min':Math.round(s/60)+' min';
+const esc=t=>String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+// ---------- maps ----------
+const MAPS=await fetch('maps/maps.json').then(r=>r.json());
+if(!MAPS.length){document.querySelector('main').innerHTML='<div style="grid-column:1/-1;display:grid;place-items:center;padding:40px;text-align:center"><div style="max-width:440px"><h2>No maps published yet</h2><p class="help">Run a DayZ server? Set up your map in a few minutes: upload your map image, trace the roads, and your players get routes and turn directions.</p><p style="margin-top:14px"><a class="btn btn-fire" href="editor.html">Set up your map</a></p></div></div>';$('mapSel').hidden=true;return;}
+const sel=$('mapSel');
+for(const m of MAPS){const o=document.createElement('option');o.value=m.id;o.textContent=m.name+(m.roads?'':' (no roads yet)');sel.appendChild(o);}
+const map=L.map('map',{crs:L.CRS.Simple,minZoom:-5,maxZoom:1.5,zoomSnap:.25,zoomDelta:.5,attributionControl:false});
+map.on('mousemove',e=>{$('coords').textContent='X '+Math.round(e.latlng.lng)+'  Z '+Math.round(e.latlng.lat)+'  ·  grid '+grid(e.latlng.lng,e.latlng.lat);});
+let SIZE=0, roads={nodes:[],edges:[]}, towns=[], cur=null;
+let imgLayer=null; const townLayer=L.layerGroup().addTo(map), roadLayer=L.layerGroup();
+const nearestTown=(x,z,max)=>{let b=null,bd=max;for(const t of towns){const d=Math.hypot(t[1]-x,t[2]-z);if(d<bd){bd=d;b=t;}}return b;};
+const placeName=(x,z)=>{const t=nearestTown(x,z,Math.max(600,SIZE*0.07));return t?('near '+t[0]):('grid '+grid(x,z));};
+$('roadsBtn').onclick=()=>{const on=$('roadsBtn').getAttribute('aria-pressed')!=='true';$('roadsBtn').setAttribute('aria-pressed',on);on?roadLayer.addTo(map):roadLayer.remove();};
+
+async function loadMap(id){
+  const m=MAPS.find(x=>x.id===id)||MAPS[0]; cur=m; sel.value=m.id;
+  history.replaceState(null,'','?map='+m.id+location.hash);
+  document.title=m.name+' · Z Wayfinder';
+  clearAll();
+  SIZE=m.size; const B=m.bounds||[[0,0],[SIZE,SIZE]];
+  if(imgLayer) map.removeLayer(imgLayer);
+  imgLayer=L.imageOverlay('maps/'+m.id+'/'+m.image,B).addTo(map);
+  const pad=SIZE*0.12; map.setMaxBounds([[-pad,-pad],[SIZE+pad,SIZE+pad]]); map.fitBounds(B);
+  [roads,towns]=await Promise.all([
+    m.roads?fetch('maps/'+m.id+'/roads.json').then(r=>r.json()):Promise.resolve({nodes:[],edges:[]}),
+    fetch('maps/'+m.id+'/towns.json').then(r=>r.ok?r.json():[]).catch(()=>[])]);
+  if(cur!==m) return;
+  townLayer.clearLayers();
+  for(const [n,x,z,kind] of towns) L.marker(ll(x,z),{interactive:false,icon:L.divIcon({className:'town '+kind,html:esc(n),iconSize:null,iconAnchor:[0,8]})}).addTo(townLayer);
+  roadLayer.clearLayers();
+  for(const e of roads.edges) L.polyline(e.pts.map(p=>ll(p[0],p[1])),{color:e.major?'#ffb347':'#e9dcc6',weight:e.major?3:e.kind==='path'?1:2,opacity:.75,dashArray:e.kind==='path'?'3 4':null,interactive:false}).addTo(roadLayer);
+  R=RoadRouter.create(roads,placeName);
+  $('credit').innerHTML='Map image: '+m.credit+(m.roads?'. Roads traced from that image, so a few small tracks may be missing; dashed route lines are off-road stretches.':'. Road routing for this map is still being traced, so routes here are straight lines for now.');
+  update();
+}
+sel.onchange=()=>loadMap(sel.value);
+
+// ---------- road graph ----------
+let R=null; const route=(A,B)=>R.route(A,B), directions=(l,d)=>R.directions(l,d), snap=(x,z)=>R.snap(x,z), segLen=(a,b)=>Math.hypot(b[0]-a[0],b[1]-a[1]);
+
+// ---------- waypoints & route drawing ----------
+const wps=[]; // {x,z,marker}
+const routeLayer=L.layerGroup().addTo(map);
+const pinIcon=(label,start)=>L.divIcon({className:'',html:`<div class="wpin${start?' start':''}"><span>${label}</span></div>`,iconSize:[26,26],iconAnchor:[13,26]});
+function renderList(){
+  const ol=$('wps'); ol.innerHTML='';
+  wps.forEach((w,i)=>{const isStart=i===0;const li=document.createElement('li');
+    li.innerHTML=`<span class="wpn${isStart?' start':''}">${isStart?'S':i}</span><span class="wpl">${esc(placeName(w.x,w.z).replace(/^(near|at) /,''))}<small>grid ${grid(w.x,w.z)}</small></span><button class="x" type="button" aria-label="Remove waypoint">✕</button>`;
+    li.querySelector('.x').onclick=()=>{map.removeLayer(w.marker);wps.splice(i,1);relabel();update();};ol.appendChild(li);});
+  if(!wps.length) ol.innerHTML='<li class="empty" style="display:block;background:none;border:0;padding:0">No waypoints yet. Tap the map where you are.</li>';
+}
+function relabel(){ wps.forEach((w,i)=>w.marker.setIcon(pinIcon(i===0?'S':i,i===0))); }
+function update(){
+  renderList(); routeLayer.clearLayers();
+  const pts=wps.map(w=>[w.x,w.z]);
+  if(pts.length<2) return clearDirs();
+  let total=0, road=0, allDirs=[];
+  for(let k=0;k<pts.length-1;k++){
+    const legs=route(pts[k],pts[k+1]); if(!legs) continue;
+    for(const l of legs){
+      const len=l.pts.reduce((s2,p,i)=>i?s2+segLen(l.pts[i-1],p):0,0); total+=len; if(l.type==='road') road+=len;
+      const latlngs=l.pts.map(p=>ll(p[0],p[1]));
+      if(l.type==='road'){L.polyline(latlngs,{color:'#1a0d05',weight:9,opacity:.65,interactive:false}).addTo(routeLayer);L.polyline(latlngs,{color:'#ffb347',weight:5,opacity:1,interactive:false}).addTo(routeLayer);}
+      else L.polyline(latlngs,{color:'#ffb347',weight:4,dashArray:'6 9',opacity:.95,interactive:false}).addTo(routeLayer);
+    }
+    const d=directions(legs,pts[k+1]); if(k<pts.length-2) d[d.length-1].t=d[d.length-1].t.replace('Arrive','Reach waypoint'); allDirs=allDirs.concat(d);
+  }
+  $('sumSec').hidden=false; $('sDist').textContent=fmtD(total); $('sRoad').textContent=total?Math.round(road/total*100)+'%':'–';
+  $('sTime').textContent=fmtT(road/(60/3.6)+(total-road)/(20/3.6));
+  const ol=$('dirs'); ol.innerHTML='';
+  for(const s of allDirs){const li=document.createElement('li');li.innerHTML=`<span class="ic">${s.ic}</span><span>${esc(s.t)}</span><span class="dd">${s.d?fmtD(s.d):''}</span>`;ol.appendChild(li);}
+}
+function clearDirs(){ $('sumSec').hidden=true; $('dirs').innerHTML='<li class="empty" style="display:block;border:0">Add a destination to get directions.</li>'; }
+function clearAll(){ wps.forEach(w=>map.removeLayer(w.marker)); wps.length=0; routeLayer.clearLayers(); }
+function addWp(x,z){
+  if(wps.length>=8){toast('Up to 8 waypoints');return;}
+  const w={x,z};
+  w.marker=L.marker(ll(x,z),{draggable:true,icon:pinIcon('?',false)}).addTo(map);
+  w.marker.on('dragend',ev=>{const p=ev.target.getLatLng();w.x=p.lng;w.z=p.lat;update();});
+  wps.push(w); relabel(); update();
+}
+map.on('click',e=>{const x=e.latlng.lng,z=e.latlng.lat; if(x<0||z<0||x>SIZE||z>SIZE) return; addWp(x,z);});
+$('clearBtn').onclick=()=>{clearAll();update();};
+
+await loadMap(new URLSearchParams(location.search).get('map')||MAPS[0].id);
+window.__dz={route,snap,get roads(){return roads},map,addWp,loadMap}; // for testing
+})();
+</script>
+</body>
+</html>

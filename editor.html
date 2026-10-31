@@ -1,0 +1,428 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Map Setup · Z Wayfinder</title>
+<meta name="description" content="Set up your server's map for Z Wayfinder: upload your map image, trace the roads, fix them and add town names.">
+<meta name="theme-color" content="#14110e">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Stencil+One&family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&family=Share+Tech+Mono&display=swap">
+<style>
+:root{
+  --ground:#14110e; --panel:#1d1915; --panel-2:#26201a; --line:#3a3027;
+  --sand:#e9dcc6; --dust:#a99a85; --fire:#f0662a; --ember:#ffb347; --blood:#c4352b; --olive:#9bb24a; --sky:#5ab7e8;
+  --display:"Saira Stencil One",Impact,"Arial Narrow",sans-serif;
+  --body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --cond:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --mono:"Share Tech Mono",ui-monospace,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--ground);color:var(--sand);font-family:var(--body);-webkit-font-smoothing:antialiased}
+body{display:flex;flex-direction:column;overflow:hidden}
+header{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap}
+header h1{margin:0;font-family:var(--display);font-weight:400;font-size:1.35rem;letter-spacing:.02em;line-height:1}
+header h1 span{color:var(--olive)}
+.grow{flex:1}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-family:var(--cond);font-weight:700;font-size:.95rem;letter-spacing:.06em;text-transform:uppercase;text-decoration:none;border-radius:6px;padding:9px 13px;border:1px solid var(--line);background:var(--panel-2);color:var(--sand);cursor:pointer;white-space:nowrap}
+.btn:hover:not(:disabled){border-color:var(--ember)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn-fire{background:var(--fire);border-color:var(--fire);color:#1a0d05}
+.btn[aria-pressed="true"]{background:rgba(255,179,71,.16);border-color:var(--ember);color:var(--ember)}
+main{flex:1;display:grid;grid-template-columns:minmax(0,1fr) 380px;min-height:0}
+#map{background:#0f0c0a;min-height:0;position:relative}
+#map.picking,#map.picking .leaflet-interactive{cursor:crosshair}
+aside{background:var(--panel);border-left:1px solid var(--line);overflow:auto;padding:16px;display:flex;flex-direction:column;gap:18px}
+h2{margin:0 0 8px;font-family:var(--cond);font-weight:700;font-size:.82rem;letter-spacing:.16em;text-transform:uppercase;color:var(--ember);display:flex;gap:8px;align-items:center}
+h2 .n{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:var(--ember);color:var(--ground);font-size:.75rem;letter-spacing:0}
+.help{color:var(--dust);font-size:.92rem;line-height:1.5;margin:0}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.card{background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:12px}
+label.f{display:flex;flex-direction:column;gap:4px;font-family:var(--cond);font-size:.82rem;letter-spacing:.08em;text-transform:uppercase;color:var(--dust)}
+input[type=text],input[type=number],select{font-family:var(--body);font-size:1rem;background:var(--ground);color:var(--sand);border:1px solid var(--line);border-radius:6px;padding:8px 10px;width:100%}
+input[type=range]{width:100%;accent-color:var(--ember)}
+.drop{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;border:2px dashed var(--line);border-radius:8px;padding:18px;text-align:center;cursor:pointer;color:var(--dust)}
+.drop:hover,.drop.over{border-color:var(--ember);color:var(--sand)}
+.drop input{display:none}
+.sw{display:inline-flex;align-items:center;gap:6px;background:var(--ground);border:1px solid var(--line);border-radius:6px;padding:4px 6px 4px 4px;font-family:var(--mono);font-size:.8rem}
+.sw i{width:18px;height:18px;border-radius:4px;border:1px solid rgba(255,255,255,.3);display:inline-block}
+.sw button{background:none;border:0;color:var(--dust);cursor:pointer;padding:0 2px;font-size:.95rem}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.stats div{background:var(--ground);border:1px solid var(--line);border-radius:6px;padding:7px 8px}
+.stats .k{font-family:var(--cond);font-size:.7rem;letter-spacing:.14em;text-transform:uppercase;color:var(--dust)}
+.stats .v{font-family:var(--cond);font-weight:700;font-size:1.1rem;font-variant-numeric:tabular-nums}
+.bar{height:6px;border-radius:3px;background:var(--ground);overflow:hidden;margin-top:8px}
+.bar i{display:block;height:100%;background:var(--ember);width:0;transition:width .2s}
+.tools{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.modehint{position:absolute;left:50%;top:12px;transform:translateX(-50%);z-index:1000;background:rgba(20,17,14,.92);border:1px solid var(--ember);color:var(--sand);border-radius:6px;padding:8px 12px;font-family:var(--cond);letter-spacing:.04em;max-width:90%;text-align:center}
+.modehint[hidden]{display:none}
+.empty-map[hidden]{display:none}
+.empty-map{position:absolute;inset:0;display:grid;place-items:center;color:var(--dust);font-family:var(--cond);letter-spacing:.06em;text-transform:uppercase;z-index:500;pointer-events:none}
+.toast{position:fixed;left:50%;top:70px;transform:translateX(-50%);background:var(--panel-2);border:1px solid var(--ember);color:var(--sand);padding:10px 16px;border-radius:6px;font-family:var(--cond);letter-spacing:.04em;z-index:2000;box-shadow:0 8px 30px rgba(0,0,0,.5);max-width:90vw}
+.leaflet-container{background:#0f0c0a;font-family:var(--body)}
+.town{font-family:var(--cond);font-weight:600;letter-spacing:.04em;color:#f3e7d2;text-shadow:0 1px 2px #000,0 0 6px #000;white-space:nowrap;font-size:12px}
+.town.city{font-size:14px;font-weight:700;text-transform:uppercase}
+.wpin{width:24px;height:24px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:var(--ember);border:2px solid #1a0d05;display:grid;place-items:center}
+.wpin span{transform:rotate(45deg);font-family:var(--mono);font-size:11px;color:#1a0d05;font-weight:700}
+.wpin.start{background:var(--sky)}
+.coords{position:absolute;right:10px;bottom:10px;z-index:1000;background:rgba(20,17,14,.85);border:1px solid var(--line);border-radius:6px;padding:5px 9px;font-family:var(--mono);font-size:.82rem;color:var(--dust);pointer-events:none}
+details summary{cursor:pointer;font-family:var(--cond);letter-spacing:.06em;text-transform:uppercase;color:var(--dust);font-size:.85rem}
+@media (max-width:860px){
+  main{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,55vh) auto}
+  body{overflow:auto} aside{border-left:0;border-top:1px solid var(--line)}
+  .coords{display:none}
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>Z <span>Wayfinder</span></h1>
+  <span class="help" id="title">Map setup for server owners</span>
+  <div class="grow"></div>
+  <button class="btn" id="undoBtn" type="button" disabled>↶ Undo</button>
+  <a class="btn" href="./">Route planner</a>
+</header>
+<main>
+  <div id="map"><div class="empty-map" id="emptyMap">Upload your map image to start</div><div class="modehint" id="hint" hidden></div><div class="coords" id="coords">—</div></div>
+  <aside>
+    <section>
+      <h2><span class="n">1</span>Your map</h2>
+      <label class="drop" id="drop"><input type="file" id="file" accept="image/png,image/jpeg,image/webp"><b>Drop your map image here</b><span class="help" style="font-size:.85rem">or click to choose. PNG, JPG or WebP, square, the whole map edge to edge. Use an image you made or have permission to use.</span></label>
+      <div class="row" style="margin-top:10px">
+        <label class="f" style="flex:2">Map name<input type="text" id="mapName" placeholder="e.g. My Server — Takistan" maxlength="60"></label>
+        <label class="f" style="flex:1">Width (m)<input type="number" id="mapSize" value="12800" min="1000" max="40960" step="10"></label>
+      </div>
+      <p class="help" style="font-size:.85rem;margin-top:6px">Width is the map's size in metres: 12800 for most 12.8 km maps, 15360 for 15 km, 10240 for 10 km. Check your map's mission or admin tool if unsure.</p>
+    </section>
+
+    <section>
+      <h2><span class="n">2</span>Find the roads</h2>
+      <p class="help">Click <b>Pick road colour</b>, then click on a road. Add a second colour for dirt roads if they're drawn differently.</p>
+      <div class="row" style="margin-top:8px">
+        <button class="btn" id="pickBtn" type="button" aria-pressed="false" disabled>Pick road colour</button>
+        <span id="swatches" class="row"></span>
+      </div>
+      <label class="f" style="margin-top:10px">Colour match <span id="tolV" style="color:var(--sand)">30</span><input type="range" id="tol" min="10" max="80" value="30"></label>
+      <details style="margin-top:6px"><summary>More settings</summary>
+        <label class="f" style="margin-top:8px">Bridge small gaps (px) <span id="gapV" style="color:var(--sand)">40</span><input type="range" id="gap" min="10" max="100" value="40"></label>
+        <label class="f" style="margin-top:8px"><span><input type="checkbox" id="thick"> Thick or faint roads (joins broken lines, may pick up more clutter)</span></label>
+      </details>
+      <div class="row" style="margin-top:10px"><button class="btn btn-fire" id="traceBtn" type="button" disabled>Trace roads</button><span class="help" id="traceMsg" style="font-size:.88rem"></span></div>
+      <div class="bar" id="bar" hidden><i></i></div>
+      <div class="stats" id="stats" style="margin-top:10px" hidden>
+        <div><div class="k">Roads</div><div class="v" id="stKm">–</div></div>
+        <div><div class="k">Junctions</div><div class="v" id="stNodes">–</div></div>
+        <div><div class="k">Pieces</div><div class="v" id="stPieces">–</div></div>
+      </div>
+    </section>
+
+    <section>
+      <h2><span class="n">3</span>Fix and label</h2>
+      <p class="help">Tracing gets most of the way. Clean up anything wrong, draw roads it missed, and name your towns and key spots.</p>
+      <div class="tools" style="margin-top:8px">
+        <button class="btn" data-mode="erase" type="button" aria-pressed="false" disabled>✕ Erase road</button>
+        <button class="btn" data-mode="draw" type="button" aria-pressed="false" disabled>✎ Draw road</button>
+        <button class="btn" data-mode="label" type="button" aria-pressed="false" disabled>⌖ Add name</button>
+        <button class="btn" data-mode="test" type="button" aria-pressed="false" disabled>⇢ Test route</button>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button class="btn" id="roadsVis" type="button" aria-pressed="true" disabled>Show roads</button>
+        <button class="btn" id="pieceBtn" type="button" disabled title="Highlights road pieces not connected to the main network">Show breaks</button>
+      </div>
+      <div class="card" id="testOut" style="margin-top:10px" hidden></div>
+    </section>
+
+    <section>
+      <h2><span class="n">4</span>Save</h2>
+      <p class="help">Save a map file to keep working later or send it to us. Publishing a player link is coming next.</p>
+      <div class="row" style="margin-top:8px">
+        <button class="btn btn-fire" id="saveBtn" type="button" disabled>Download map file</button>
+        <label class="btn" style="cursor:pointer">Open map file<input type="file" id="openFile" accept=".json,application/json" hidden></label>
+      </div>
+      <p class="help" id="draftMsg" style="font-size:.82rem;margin-top:8px"></p>
+    </section>
+  </aside>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="tracer.js"></script>
+<script src="router.js"></script>
+<script>
+(function(){
+'use strict';
+const $=id=>document.getElementById(id);
+const toast=(m,ms=3200)=>{const t=document.createElement('div');t.className='toast';t.textContent=m;document.body.appendChild(t);setTimeout(()=>t.remove(),ms);};
+const esc=t=>String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const ll=(x,z)=>L.latLng(z,x);
+const hex=c=>'#'+c.map(v=>v.toString(16).padStart(2,'0')).join('');
+const plen=pts=>pts.reduce((s,p,i)=>i?s+Math.hypot(p[0]-pts[i-1][0],p[1]-pts[i-1][1]):0,0);
+const fmtD=m=>m>=1000?(m/1000).toFixed(m>=10000?0:1)+' km':Math.round(m/10)*10+' m';
+const MAXPX=2400; // tracing resolution cap (keeps it to a couple of seconds)
+
+// ---------- state ----------
+const S={name:'',size:12800,imgW:0,imgH:0,imageURL:null,imageBlob:null,samples:[],roads:{nodes:[],edges:[]},towns:[]};
+let work=null; // {width,height,data} downscaled pixels for tracing/sampling
+let bounds=null, imgLayer=null, mode=null;
+const undo=[];
+
+// ---------- map ----------
+const map=L.map('map',{crs:L.CRS.Simple,minZoom:-6,maxZoom:2,zoomSnap:.25,zoomDelta:.5,attributionControl:false,doubleClickZoom:false});
+map.setView([0,0],-5);
+map.on('mousemove',e=>{$('coords').textContent='X '+Math.round(e.latlng.lng)+'  Z '+Math.round(e.latlng.lat);});
+const roadLayer=L.layerGroup().addTo(map), townLayer=L.layerGroup().addTo(map), drawLayer=L.layerGroup().addTo(map), testLayer=L.layerGroup().addTo(map), breakLayer=L.layerGroup();
+
+function setBounds(){
+  const W=S.size, Hm=S.size*(S.imgH/S.imgW);
+  bounds=[[0,0],[Hm,W]];
+  if(imgLayer) map.removeLayer(imgLayer);
+  imgLayer=L.imageOverlay(S.imageURL,bounds).addTo(map); imgLayer.bringToBack();
+  const pad=W*0.1; map.setMaxBounds([[-pad,-pad],[Hm+pad,W+pad]]); map.fitBounds(bounds);
+}
+
+// ---------- image upload ----------
+async function loadImage(blob){
+  if(!/^image\//.test(blob.type)){toast('That file is not an image');return;}
+  const url=URL.createObjectURL(blob);
+  const img=new Image(); img.src=url;
+  try{await img.decode();}catch{toast('Could not read that image');return;}
+  if(S.imageURL) URL.revokeObjectURL(S.imageURL);
+  S.imageURL=url; S.imageBlob=blob; S.imgW=img.naturalWidth; S.imgH=img.naturalHeight;
+  const k=Math.min(1,MAXPX/Math.max(S.imgW,S.imgH));
+  const c=document.createElement('canvas'); c.width=Math.round(S.imgW*k); c.height=Math.round(S.imgH*k);
+  const g=c.getContext('2d',{willReadFrequently:true}); g.drawImage(img,0,0,c.width,c.height);
+  work={width:c.width,height:c.height,data:g.getImageData(0,0,c.width,c.height).data};
+  $('emptyMap').hidden=true;
+  if(!$('mapName').value) $('mapName').value=blob.name?blob.name.replace(/\.[a-z]+$/i,'').replace(/[_-]+/g,' '):'';
+  if(Math.abs(S.imgW-S.imgH)/S.imgW>0.05) toast('This image is not square. Crop it to the map edges for accurate distances.',5000);
+  setBounds(); enable();
+}
+$('file').onchange=e=>{const f=e.target.files[0]; if(f) loadImage(f);};
+const drop=$('drop');
+['dragenter','dragover'].forEach(t=>drop.addEventListener(t,e=>{e.preventDefault();drop.classList.add('over');}));
+['dragleave','drop'].forEach(t=>drop.addEventListener(t,e=>{e.preventDefault();drop.classList.remove('over');}));
+drop.addEventListener('drop',e=>{const f=e.dataTransfer.files[0]; if(f) loadImage(f);});
+$('mapSize').onchange=()=>{const v=+$('mapSize').value; if(!(v>=1000&&v<=40960)){$('mapSize').value=S.size;return;}
+  const k=v/S.size; S.size=v;
+  // rescale existing data so it stays on the image
+  S.roads.nodes=S.roads.nodes.map(p=>[p[0]*k,p[1]*k]); S.roads.edges.forEach(e=>{e.pts=e.pts.map(p=>[p[0]*k,p[1]*k]);e.len*=k;});
+  S.towns=S.towns.map(t=>[t[0],t[1]*k,t[2]*k,t[3]]);
+  if(S.imageURL){setBounds();redraw();}};
+$('mapName').oninput=()=>{S.name=$('mapName').value.trim();saveDraftSoon();};
+
+function enable(){
+  const has=!!S.imageURL, roads=S.roads.edges.length>0;
+  $('pickBtn').disabled=!has; $('traceBtn').disabled=!has||!S.samples.length;
+  document.querySelectorAll('[data-mode]').forEach(b=>b.disabled=!has);
+  $('roadsVis').disabled=!roads; $('pieceBtn').disabled=!roads; $('saveBtn').disabled=!has;
+  $('undoBtn').disabled=!undo.length;
+}
+
+// ---------- modes ----------
+const HINTS={pick:'Click on a road to pick its colour',erase:'Click a road to erase it (between two junctions)',draw:'Click to add points along the road. Double-click or press Enter to finish. Ends snap to nearby roads.',label:'Click where a town or place name should go',test:'Click a start point, then a destination'};
+function setMode(m){
+  if(mode==='draw') finishDraw(true);
+  mode=(mode===m)?null:m;
+  $('pickBtn').setAttribute('aria-pressed',mode==='pick');
+  document.querySelectorAll('[data-mode]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.mode===mode));
+  $('hint').hidden=!mode; $('hint').textContent=mode?HINTS[mode]:'';
+  $('map').classList.toggle('picking',!!mode);
+  if(mode!=='test'){testPts.length=0;testLayer.clearLayers();$('testOut').hidden=true;}
+  redraw();
+}
+$('pickBtn').onclick=()=>setMode('pick');
+document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>setMode(b.dataset.mode));
+document.addEventListener('keydown',e=>{
+  if(e.target.matches('input,select,textarea')) return;
+  if(e.key==='Escape'&&mode) setMode(mode);
+  if(e.key==='Enter'&&mode==='draw') finishDraw();
+  if((e.ctrlKey||e.metaKey)&&e.key==='z'){e.preventDefault();doUndo();}
+});
+
+// world <-> work pixels
+const toPx=(x,z)=>[Math.round(x/S.size*work.width),Math.round((bounds[1][0]-z)/bounds[1][0]*work.height)];
+
+map.on('click',e=>{
+  const x=e.latlng.lng, z=e.latlng.lat;
+  if(!S.imageURL||x<0||z<0||x>S.size||z>bounds[1][0]) return;
+  if(mode==='pick'){
+    const [px,py]=toPx(x,z); const c=RoadTracer.sampleColour(work,px,py,1);
+    if(S.samples.some(s=>Math.hypot(s[0]-c[0],s[1]-c[1],s[2]-c[2])<8)){toast('That colour is already picked');return;}
+    S.samples.push(c); renderSwatches(); setMode('pick'); enable(); toast('Road colour added. Now press Trace roads.');
+  } else if(mode==='draw'){ drawPts.push([x,z]); renderDraw(); }
+  else if(mode==='label'){ addLabel(x,z); }
+  else if(mode==='test'){ addTest(x,z); }
+});
+map.on('dblclick',e=>{ if(mode==='draw'){ L.DomEvent.stop(e); finishDraw(); } });
+
+// ---------- colours ----------
+function renderSwatches(){
+  const el=$('swatches'); el.innerHTML='';
+  S.samples.forEach((c,i)=>{const s=document.createElement('span');s.className='sw';s.innerHTML=`<i style="background:${hex(c)}"></i>${hex(c)}<button type="button" aria-label="Remove colour">✕</button>`;
+    s.querySelector('button').onclick=()=>{S.samples.splice(i,1);renderSwatches();enable();};el.appendChild(s);});
+}
+$('tol').oninput=()=>$('tolV').textContent=$('tol').value;
+$('gap').oninput=()=>$('gapV').textContent=$('gap').value;
+
+// ---------- tracing ----------
+let worker=null;
+$('traceBtn').onclick=()=>{
+  if(S.roads.edges.length&&!confirm('Tracing again replaces the current roads (your names stay). Continue?')) return;
+  if(worker) worker.terminate();
+  worker=new Worker('trace-worker.js');
+  const buf=work.data.slice().buffer;
+  $('bar').hidden=false; $('bar').firstElementChild.style.width='5%'; $('traceBtn').disabled=true; $('traceMsg').textContent='Tracing…';
+  worker.onmessage=ev=>{const d=ev.data;
+    if(d.type==='progress'){$('bar').firstElementChild.style.width=Math.round(d.f*100)+'%';$('traceMsg').textContent=d.msg+'…';return;}
+    $('traceBtn').disabled=false; setTimeout(()=>{$('bar').hidden=true;},600); worker.terminate(); worker=null;
+    if(d.type==='error'){$('traceMsg').textContent='Tracing failed: '+d.msg;return;}
+    pushUndo();
+    S.roads={nodes:d.res.nodes,edges:d.res.edges};
+    $('traceMsg').textContent=d.res.edges.length?'Done. Check the roads on the map.':'No roads found. Pick the colour again on a clearer stretch of road, or raise Colour match.';
+    redraw(); enable(); saveDraftSoon();
+  };
+  worker.postMessage({width:work.width,height:work.height,buffer:buf,opts:{samples:S.samples,tol:+$('tol').value,gap:+$('gap').value,close:$('thick').checked?2:1,size:S.size,bounds}},[buf]);
+};
+
+// ---------- drawing roads/labels ----------
+function redraw(){
+  roadLayer.clearLayers(); townLayer.clearLayers(); breakLayer.clearLayers();
+  const show=$('roadsVis').getAttribute('aria-pressed')==='true';
+  if(show) S.roads.edges.forEach((e,i)=>{
+    const pl=L.polyline(e.pts.map(p=>ll(p[0],p[1])),{color:e.gap?'#9bb24a':'#ff3df0',weight:mode==='erase'?6:3,opacity:.9,interactive:mode==='erase'}).addTo(roadLayer);
+    if(mode==='erase'){pl.on('mouseover',()=>pl.setStyle({color:'#ff4d4d',weight:8}));pl.on('mouseout',()=>pl.setStyle({color:e.gap?'#9bb24a':'#ff3df0',weight:6}));
+      pl.on('click',ev=>{L.DomEvent.stop(ev);eraseEdge(i);});}
+  });
+  S.towns.forEach((t,i)=>{
+    const m=L.marker(ll(t[1],t[2]),{draggable:true,icon:L.divIcon({className:'town '+(t[3]||'village'),html:esc(t[0]),iconSize:null,iconAnchor:[0,8]})}).addTo(townLayer);
+    m.on('dragend',ev=>{pushUndo();const p=ev.target.getLatLng();t[1]=+p.lng.toFixed(1);t[2]=+p.lat.toFixed(1);saveDraftSoon();});
+    m.on('click',ev=>{L.DomEvent.stop(ev); if(mode==='erase'){pushUndo();S.towns.splice(i,1);redraw();saveDraftSoon();} else editLabel(i);});
+  });
+  const st=stats();
+  $('stats').hidden=!S.roads.edges.length; $('stKm').textContent=fmtD(st.m); $('stNodes').textContent=st.junctions; $('stPieces').textContent=st.pieces;
+  if($('pieceBtn').getAttribute('aria-pressed')==='true') drawBreaks();
+}
+function comps(){const n=S.roads.nodes.length,par=Array.from({length:n},(_,i)=>i);const f=i=>par[i]===i?i:(par[i]=f(par[i]));for(const e of S.roads.edges)par[f(e.a)]=f(e.b);return f;}
+function stats(){
+  const n=S.roads.nodes.length,deg=new Array(n).fill(0); for(const e of S.roads.edges){deg[e.a]++;deg[e.b]++;}
+  const f=comps(), roots=new Set(); S.roads.edges.forEach(e=>roots.add(f(e.a)));
+  return {m:S.roads.edges.reduce((s,e)=>s+e.len,0),junctions:deg.filter(d=>d>=3).length,pieces:roots.size};
+}
+function drawBreaks(){
+  const f=comps(), len={}; S.roads.edges.forEach(e=>{const r=f(e.a);len[r]=(len[r]||0)+e.len;});
+  const main=Object.entries(len).sort((a,b)=>b[1]-a[1])[0]; if(!main) return;
+  S.roads.edges.forEach(e=>{ if(String(f(e.a))!==main[0]) L.polyline(e.pts.map(p=>ll(p[0],p[1])),{color:'#5ab7e8',weight:7,opacity:.9,interactive:false}).addTo(breakLayer); });
+}
+$('roadsVis').onclick=()=>{const on=$('roadsVis').getAttribute('aria-pressed')!=='true';$('roadsVis').setAttribute('aria-pressed',on);redraw();};
+$('pieceBtn').onclick=()=>{const on=$('pieceBtn').getAttribute('aria-pressed')!=='true';$('pieceBtn').setAttribute('aria-pressed',on);
+  if(on){breakLayer.addTo(map);toast('Blue roads are not connected to the main network. Draw a short road to join them, or erase them.',5000);} else breakLayer.remove(); redraw();};
+
+function eraseEdge(i){
+  pushUndo(); S.roads.edges.splice(i,1); compact(); redraw(); saveDraftSoon();
+}
+function compact(){ // drop unused nodes
+  const used=new Map(), out=[];
+  for(const e of S.roads.edges) for(const k of ['a','b']){const n=e[k]; if(!used.has(n)){used.set(n,out.length);out.push(S.roads.nodes[n]);} e[k]=used.get(n);}
+  S.roads.nodes=out;
+}
+
+// draw a new road
+const drawPts=[];
+function renderDraw(){ drawLayer.clearLayers(); if(!drawPts.length) return;
+  L.polyline(drawPts.map(p=>ll(p[0],p[1])),{color:'#ffb347',weight:4,dashArray:'6 6'}).addTo(drawLayer);
+  drawPts.forEach(p=>L.circleMarker(ll(p[0],p[1]),{radius:4,color:'#1a0d05',fillColor:'#ffb347',fillOpacity:1,weight:1}).addTo(drawLayer)); }
+function snapTo(p){ // returns node index, splitting an edge if needed; snap distance ~ 14 screen px
+  const tol=14/Math.pow(2,map.getZoom());
+  let bn=-1,bd=tol; S.roads.nodes.forEach((n,i)=>{const d=Math.hypot(n[0]-p[0],n[1]-p[1]);if(d<bd){bd=d;bn=i;}});
+  if(bn>=0) return bn;
+  let best=null;
+  S.roads.edges.forEach((e,ei)=>{for(let k=0;k<e.pts.length-1;k++){const a=e.pts[k],b=e.pts[k+1],dx=b[0]-a[0],dz=b[1]-a[1],L2=dx*dx+dz*dz;let t=L2?((p[0]-a[0])*dx+(p[1]-a[1])*dz)/L2:0;t=Math.max(0,Math.min(1,t));const q=[a[0]+t*dx,a[1]+t*dz],d=Math.hypot(q[0]-p[0],q[1]-p[1]);if(d<tol&&(!best||d<best.d))best={d,ei,k,q};}});
+  const nid=S.roads.nodes.length;
+  if(best){ const e=S.roads.edges[best.ei]; S.roads.nodes.push(best.q);
+    const p1=e.pts.slice(0,best.k+1).concat([best.q]), p2=[best.q].concat(e.pts.slice(best.k+1));
+    S.roads.edges[best.ei]={...e,b:nid,pts:p1,len:plen(p1)}; S.roads.edges.push({...e,a:nid,b:e.b,pts:p2,len:plen(p2)}); return nid; }
+  S.roads.nodes.push(p); return nid;
+}
+function finishDraw(silent){
+  if(drawPts.length<2){ if(!silent&&drawPts.length) toast('A road needs at least two points'); drawPts.length=0; renderDraw(); return; }
+  pushUndo();
+  const pts=drawPts.map(p=>[+p[0].toFixed(1),+p[1].toFixed(1)]);
+  const a=snapTo(pts[0]); const b=snapTo(pts[pts.length-1]);
+  pts[0]=S.roads.nodes[a]; pts[pts.length-1]=S.roads.nodes[b];
+  S.roads.edges.push({a,b,pts,len:+plen(pts).toFixed(1),drawn:true});
+  drawPts.length=0; renderDraw(); redraw(); enable(); saveDraftSoon(); if(!silent) toast('Road added');
+}
+
+// labels
+function addLabel(x,z){
+  const n=prompt('Name for this place (town, trader, base…)'); if(!n||!n.trim()) return;
+  const city=confirm('Show it as a big name (city or major place)?\nOK = big, Cancel = normal');
+  pushUndo(); S.towns.push([n.trim().slice(0,40),+x.toFixed(1),+z.toFixed(1),city?'city':'village']); redraw(); saveDraftSoon();
+}
+function editLabel(i){
+  const t=S.towns[i]; const n=prompt('Rename (leave empty to delete)',t[0]); if(n===null) return;
+  pushUndo(); if(!n.trim()) S.towns.splice(i,1); else t[0]=n.trim().slice(0,40); redraw(); saveDraftSoon();
+}
+
+// test route
+const testPts=[];
+function nearestTown(x,z,max){let b=null,bd=max;for(const t of S.towns){const d=Math.hypot(t[1]-x,t[2]-z);if(d<bd){bd=d;b=t;}}return b;}
+const placeName=(x,z)=>{const t=nearestTown(x,z,Math.max(600,S.size*0.07));return t?('near '+t[0]):('grid '+String(Math.floor(x/100)).padStart(3,'0')+' '+String(Math.floor(z/100)).padStart(3,'0'));};
+function addTest(x,z){
+  if(testPts.length>=2) testPts.length=0;
+  testPts.push([x,z]); testLayer.clearLayers();
+  testPts.forEach((p,i)=>L.marker(ll(p[0],p[1]),{interactive:false,icon:L.divIcon({className:'',html:`<div class="wpin${i?'':' start'}"><span>${i?'1':'S'}</span></div>`,iconSize:[24,24],iconAnchor:[12,24]})}).addTo(testLayer));
+  if(testPts.length<2){$('testOut').hidden=true;return;}
+  const R=RoadRouter.create(S.roads,placeName); const legs=R.route(testPts[0],testPts[1]);
+  let tot=0,road=0; for(const l of legs){const d=plen(l.pts);tot+=d;if(l.type==='road')road+=d;
+    L.polyline(l.pts.map(p=>ll(p[0],p[1])),l.type==='road'?{color:'#ffb347',weight:6}:{color:'#ffb347',weight:4,dashArray:'6 9'}).addTo(testLayer);}
+  const dirs=R.directions(legs,testPts[1]);
+  $('testOut').hidden=false;
+  $('testOut').innerHTML=`<b>${fmtD(tot)}</b> · ${tot?Math.round(road/tot*100):0}% on road<ol class="help" style="margin:8px 0 0;padding-left:18px">${dirs.map(d=>`<li>${esc(d.t)}${d.d?' · '+fmtD(d.d):''}</li>`).join('')}</ol>`+
+    (tot&&road/tot<0.6?'<p class="help" style="margin-top:6px;color:var(--ember)">Mostly off-road: a road here may be missing or broken. Try Show breaks.</p>':'');
+}
+
+// ---------- undo ----------
+function pushUndo(){ undo.push(JSON.stringify({roads:S.roads,towns:S.towns})); if(undo.length>40) undo.shift(); enable(); }
+function doUndo(){ const s=undo.pop(); if(!s) return; const o=JSON.parse(s); S.roads=o.roads; S.towns=o.towns; redraw(); enable(); saveDraftSoon(); }
+$('undoBtn').onclick=doUndo;
+
+// ---------- save / open ----------
+function blobToDataURL(b){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(b);});}
+function payload(){ return {format:'dayz-route-map',version:1,name:S.name||'Untitled map',size:S.size,imgW:S.imgW,imgH:S.imgH,samples:S.samples,
+  roads:{size:S.size,nodes:S.roads.nodes,edges:S.roads.edges.map(({a,b,pts,len,gap,drawn})=>({a,b,pts,len,...(gap?{gap}:{}),...(drawn?{drawn}:{})}))},towns:S.towns}; }
+$('saveBtn').onclick=async()=>{
+  const p=payload(); p.image=await blobToDataURL(S.imageBlob);
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([JSON.stringify(p)],{type:'application/json'}));
+  a.download=(p.name.replace(/[^\w\- ]+/g,'').trim().replace(/\s+/g,'-')||'map')+'.dayzmap.json'; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+};
+$('openFile').onchange=async e=>{
+  const f=e.target.files[0]; if(!f) return;
+  try{ const p=JSON.parse(await f.text()); if(p.format!=='dayz-route-map') throw 0;
+    const blob=await (await fetch(p.image)).blob(); await restore(p,blob); toast('Map file opened'); }
+  catch{ toast('That is not a map file from this tool'); }
+  e.target.value='';
+};
+async function restore(p,blob){
+  S.size=p.size; $('mapSize').value=p.size; S.name=p.name||''; $('mapName').value=S.name;
+  await loadImage(blob);
+  S.samples=p.samples||[]; S.roads=p.roads||{nodes:[],edges:[]}; S.towns=p.towns||[]; undo.length=0;
+  renderSwatches(); redraw(); enable();
+}
+
+// draft in this browser (IndexedDB holds the image too); best effort
+let draftT=null;
+function db(){return new Promise((res,rej)=>{const r=indexedDB.open('dayz-route-editor',1);r.onupgradeneeded=()=>r.result.createObjectStore('drafts');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});}
+function saveDraftSoon(){ clearTimeout(draftT); draftT=setTimeout(async()=>{ try{ if(!S.imageBlob) return; const d=await db(); const tx=d.transaction('drafts','readwrite');
+  tx.objectStore('drafts').put({p:payload(),blob:S.imageBlob,t:Date.now()},'current'); tx.oncomplete=()=>{$('draftMsg').textContent='Draft saved in this browser.';}; }catch{} },800); }
+(async()=>{ try{ const d=await db(); const r=d.transaction('drafts').objectStore('drafts').get('current');
+  r.onsuccess=async()=>{ const v=r.result; if(!v||!v.blob) return;
+    if(confirm('Continue the map you were working on ("'+(v.p.name||'Untitled')+'")?')){ await restore(v.p,v.blob); $('draftMsg').textContent='Draft restored.'; } }; }catch{} })();
+
+window.__ed={S,loadImage,setMode,finishDraw,addTest,redraw,map,drawPts}; // for testing
+enable();
+})();
+</script>
+</body>
+</html>
